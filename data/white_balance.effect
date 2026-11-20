@@ -1,0 +1,49 @@
+/*
+ * HDR White Balance for OBS
+ *
+ * OBS gives filters linear-light pixels (premultiplied alpha) in linear
+ * Rec.709, whether the source is SDR (0..1) or HDR (values above 1.0).
+ * White balance is a per-channel multiply in linear light, so the same
+ * shader is correct for both. Premultiplied alpha is unaffected because the
+ * multiply commutes with it.
+ */
+
+uniform float4x4 ViewProj;
+uniform texture2d image;
+
+uniform float3 gain;
+
+sampler_state textureSampler {
+	Filter   = Linear;
+	AddressU = Clamp;
+	AddressV = Clamp;
+};
+
+struct VertData {
+	float4 pos : POSITION;
+	float2 uv  : TEXCOORD0;
+};
+
+VertData VSDefault(VertData v_in)
+{
+	VertData vert_out;
+	vert_out.pos = mul(float4(v_in.pos.xyz, 1.0), ViewProj);
+	vert_out.uv  = v_in.uv;
+	return vert_out;
+}
+
+float4 PSWhiteBalance(VertData v_in) : TARGET
+{
+	float4 rgba = image.Sample(textureSampler, v_in.uv);
+	rgba.rgb *= gain;
+	return rgba;
+}
+
+technique Draw
+{
+	pass
+	{
+		vertex_shader = VSDefault(v_in);
+		pixel_shader  = PSWhiteBalance(v_in);
+	}
+}
